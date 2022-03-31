@@ -81,13 +81,14 @@ class EntityType:
 
 
 class Token:
-    def __init__(self, tid: int, index: int, span_start: int, span_end: int, phrase: str):
+    def __init__(self, tid: int, index: int, span_start: int, span_end: int, phrase: str, pos_tag: int):
         self._tid = tid  # ID within the corresponding dataset
         self._index = index  # original token index in document
 
         self._span_start = span_start  # start of token span in document (inclusive)
         self._span_end = span_end  # end of token span in document (exclusive)
         self._phrase = phrase
+        self._pos_tag = pos_tag
 
     @property
     def index(self):
@@ -108,6 +109,10 @@ class Token:
     @property
     def phrase(self):
         return self._phrase
+
+    @property
+    def pos_tag(self):
+        return self._pos_tag
 
     def __eq__(self, other):
         if isinstance(other, Token):
@@ -139,6 +144,10 @@ class TokenSpan:
     @property
     def span(self):
         return self.span_start, self.span_end
+
+    @property
+    def pos_tags(self):
+        return [token.pos_tag for token in self._tokens]
 
     def __getitem__(self, s):
         if isinstance(s, slice):
@@ -360,8 +369,8 @@ class Dataset(TorchDataset):
     def iterate_relations(self, batch_size, order=None, truncate=False):
         return BatchIterator(self.relations, batch_size, order=order, truncate=truncate)
 
-    def create_token(self, idx, span_start, span_end, phrase) -> Token:
-        token = Token(self._tid, idx, span_start, span_end, phrase)
+    def create_token(self, idx, span_start, span_end, phrase, pos_tag) -> Token:
+        token = Token(self._tid, idx, span_start, span_end, phrase, pos_tag)
         self._tid += 1
         return token
 

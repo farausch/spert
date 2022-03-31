@@ -1,4 +1,5 @@
 import argparse
+from email.policy import default
 
 
 def _add_common_args(arg_parser):
@@ -36,6 +37,9 @@ def _add_common_args(arg_parser):
     arg_parser.add_argument('--cache_path', type=str, default=None,
                             help="Path to cache transformer models (for HuggingFace transformers library)")
     arg_parser.add_argument('--debug', action='store_true', default=False, help="Debugging mode on/off")
+
+    # Spacy for linguistic feature extraction
+    arg_parser.add_argument('--spacy_model_name', type=str, default=None, help="Name of the spaCy model to use for linguistic feature extraction")
 
 
 def _add_logging_args(arg_parser):

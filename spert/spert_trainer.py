@@ -47,7 +47,7 @@ class SpERTTrainer(BaseTrainer):
         self._init_eval_logging(valid_label)
 
         # read datasets
-        input_reader = input_reader_cls(types_path, self._tokenizer, args.neg_entity_count,
+        input_reader = input_reader_cls(types_path, self._tokenizer, args.spacy_model_name, args.neg_entity_count,
                                         args.neg_relation_count, args.max_span_size, self._logger)
         train_dataset = input_reader.read(train_path, train_label)
         validation_dataset = input_reader.read(valid_path, valid_label)

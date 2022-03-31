@@ -5,6 +5,7 @@ from logging import Logger
 from typing import List
 from tqdm import tqdm
 from transformers import BertTokenizer
+from spacy.tokens import Doc
 
 from spert import util
 from spert.entities import Dataset, EntityType, RelationType, Entity, Relation, Document
@@ -12,7 +13,7 @@ from spert.opt import spacy
 
 
 class BaseInputReader(ABC):
-    def __init__(self, types_path: str, tokenizer: BertTokenizer, neg_entity_count: int = None,
+    def __init__(self, types_path: str, tokenizer: BertTokenizer, spacy_model_name: str, neg_entity_count: int = None,
                  neg_rel_count: int = None, max_span_size: int = None, logger: Logger = None, **kwargs):
         types = json.load(open(types_path), object_pairs_hook=OrderedDict)  # entity + relation types
 
@@ -55,6 +56,8 @@ class BaseInputReader(ABC):
         self._logger = logger
 
         self._vocabulary_size = tokenizer.vocab_size
+
+        self._spacy_instance = spacy.load(spacy_model_name)
 
     @abstractmethod
     def read(self, dataset_path, dataset_label):
@@ -112,9 +115,9 @@ class BaseInputReader(ABC):
 
 
 class JsonInputReader(BaseInputReader):
-    def __init__(self, types_path: str, tokenizer: BertTokenizer, neg_entity_count: int = None,
+    def __init__(self, types_path: str, tokenizer: BertTokenizer, spacy_model_name: str, neg_entity_count: int = None,
                  neg_rel_count: int = None, max_span_size: int = None, logger: Logger = None):
-        super().__init__(types_path, tokenizer, neg_entity_count, neg_rel_count, max_span_size, logger)
+        super().__init__(types_path, tokenizer, spacy_model_name, neg_entity_count, neg_rel_count, max_span_size, logger)
 
     def read(self, dataset_path, dataset_label):
         dataset = Dataset(dataset_label, self._relation_types, self._entity_types, self._neg_entity_count,
@@ -134,7 +137,7 @@ class JsonInputReader(BaseInputReader):
         jentities = doc['entities']
 
         # parse tokens
-        doc_tokens, doc_encoding = _parse_tokens(jtokens, dataset, self._tokenizer)
+        doc_tokens, doc_encoding = _parse_tokens(jtokens, dataset, self._tokenizer, self._spacy_instance)
 
         # parse entity mentions
         entities = self._parse_entities(jentities, doc_tokens, dataset)
@@ -224,8 +227,13 @@ class JsonPredictionInputReader(BaseInputReader):
         return document
 
 
-def _parse_tokens(jtokens, dataset, tokenizer):
+def _parse_tokens(jtokens, dataset, tokenizer, spacy_instance):
     doc_tokens = []
+
+    # generate spacy sentence from token array and get POS tags
+    sentence = Doc(spacy_instance.vocab, words=jtokens)
+    sentence = spacy_instance(sentence.text)
+    pos_tags = [(token.pos) for token in sentence]
 
     # full document encoding including special tokens ([CLS] and [SEP]) and byte-pair encodings of original tokens
     doc_encoding = [tokenizer.convert_tokens_to_ids('[CLS]')]
@@ -237,7 +245,7 @@ def _parse_tokens(jtokens, dataset, tokenizer):
             token_encoding = [tokenizer.convert_tokens_to_ids('[UNK]')]
         span_start, span_end = (len(doc_encoding), len(doc_encoding) + len(token_encoding))
 
-        token = dataset.create_token(i, span_start, span_end, token_phrase)
+        token = dataset.create_token(i, span_start, span_end, token_phrase, pos_tags[i])
 
         doc_tokens.append(token)
         doc_encoding += token_encoding
