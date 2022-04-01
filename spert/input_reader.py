@@ -233,7 +233,7 @@ def _parse_tokens(jtokens, dataset, tokenizer, spacy_instance):
     # generate spacy sentence from token array and get POS tags
     sentence = Doc(spacy_instance.vocab, words=jtokens)
     sentence = spacy_instance(sentence.text)
-    pos_tags = [(token.pos) for token in sentence]
+    pos_tags = [(token.pos_) for token in sentence]
 
     # full document encoding including special tokens ([CLS] and [SEP]) and byte-pair encodings of original tokens
     doc_encoding = [tokenizer.convert_tokens_to_ids('[CLS]')]

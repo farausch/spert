@@ -7,6 +7,7 @@ from spert import util
 
 def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, max_span_size: int, rel_type_count: int):
     encodings = doc.encoding
+    doc_pos_tags = create_doc_pos_tags(doc)
     token_count = len(doc.tokens)
     context_size = len(encodings)
 
@@ -96,6 +97,9 @@ def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, max_span
     # masking of tokens
     context_masks = torch.ones(context_size, dtype=torch.bool)
 
+    # POS tags per byte-encoded token
+    doc_pos_tags = torch.tensor(doc_pos_tags, dtype=torch.int)
+
     # also create samples_masks:
     # tensors to mask entity/relation samples of batch
     # since samples are stacked into batches, "padding" entities/relations possibly must be created
@@ -126,12 +130,13 @@ def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, max_span
 
     return dict(encodings=encodings, context_masks=context_masks, entity_masks=entity_masks,
                 entity_sizes=entity_sizes, entity_types=entity_types,
-                rels=rels, rel_masks=rel_masks, rel_types=rel_types,
+                rels=rels, rel_masks=rel_masks, rel_types=rel_types, doc_pos_tags=doc_pos_tags,
                 entity_sample_masks=entity_sample_masks, rel_sample_masks=rel_sample_masks)
 
 
 def create_eval_sample(doc, max_span_size: int):
     encodings = doc.encoding
+    doc_pos_tags = create_doc_pos_tags(doc)
     token_count = len(doc.tokens)
     context_size = len(encodings)
 
@@ -157,6 +162,9 @@ def create_eval_sample(doc, max_span_size: int):
     context_masks = torch.zeros(context_size, dtype=torch.bool)
     context_masks[:len(_encoding)] = 1
 
+    # POS tags per byte-encoded token
+    doc_pos_tags = torch.tensor(doc_pos_tags, dtype=torch.int)
+
     # entities
     if entity_masks:
         entity_masks = torch.stack(entity_masks)
@@ -174,7 +182,7 @@ def create_eval_sample(doc, max_span_size: int):
         entity_spans = torch.zeros([1, 2], dtype=torch.long)
         entity_sample_masks = torch.zeros([1], dtype=torch.bool)
 
-    return dict(encodings=encodings, context_masks=context_masks, entity_masks=entity_masks,
+    return dict(encodings=encodings, context_masks=context_masks, entity_masks=entity_masks, doc_pos_tags=doc_pos_tags,
                 entity_sizes=entity_sizes, entity_spans=entity_spans, entity_sample_masks=entity_sample_masks)
 
 
@@ -189,6 +197,24 @@ def create_rel_mask(s1, s2, context_size):
     end = s2[0] if s1[1] < s2[0] else s1[0]
     mask = create_entity_mask(start, end, context_size)
     return mask
+
+
+def create_pos_mask(pos_tag: str, pos_tags: dict):
+    mask = [0] * len(pos_tags)
+    idx = pos_tags[pos_tag]
+    mask[idx] = 1
+    return mask
+
+
+def create_doc_pos_tags(doc):
+    # Create a POS tag mask for each byte-pair encoded token in the sentence plus an empty mask at the beginning and end (special tokens)
+    doc_pos_tags = []
+    doc_pos_tags.append([0] * len(util.get_pos_dict()))
+    for token in doc._tokens:
+        for i in range(token.span_start, token.span_end):
+            doc_pos_tags.append(create_pos_mask(token.pos_tag, util.get_pos_dict()))
+    doc_pos_tags.append([0] * len(util.get_pos_dict()))
+    return doc_pos_tags
 
 
 def collate_fn_padding(batch):

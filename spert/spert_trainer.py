@@ -118,7 +118,7 @@ class SpERTTrainer(BaseTrainer):
         self._init_eval_logging(dataset_label)
 
         # read datasets
-        input_reader = input_reader_cls(types_path, self._tokenizer,
+        input_reader = input_reader_cls(types_path, self._tokenizer, args.spacy_model_name,
                                         max_span_size=args.max_span_size, logger=self._logger)
         test_dataset = input_reader.read(dataset_path, dataset_label)
         self._log_datasets(input_reader)
@@ -164,7 +164,8 @@ class SpERTTrainer(BaseTrainer):
                                             prop_drop=self._args.prop_drop,
                                             size_embedding=self._args.size_embedding,
                                             freeze_transformer=self._args.freeze_transformer,
-                                            cache_dir=self._args.cache_path)
+                                            cache_dir=self._args.cache_path,
+                                            pos_dict_len=len(util.get_pos_dict()))
 
         return model
 
@@ -188,7 +189,8 @@ class SpERTTrainer(BaseTrainer):
             # forward step
             entity_logits, rel_logits = model(encodings=batch['encodings'], context_masks=batch['context_masks'],
                                               entity_masks=batch['entity_masks'], entity_sizes=batch['entity_sizes'],
-                                              relations=batch['rels'], rel_masks=batch['rel_masks'])
+                                              relations=batch['rels'], rel_masks=batch['rel_masks'],
+                                              doc_pos_tags=batch['doc_pos_tags'])
 
             # compute loss and optimize parameters
             batch_loss = compute_loss.compute(entity_logits=entity_logits, rel_logits=rel_logits,
@@ -238,7 +240,7 @@ class SpERTTrainer(BaseTrainer):
                 result = model(encodings=batch['encodings'], context_masks=batch['context_masks'],
                                entity_masks=batch['entity_masks'], entity_sizes=batch['entity_sizes'],
                                entity_spans=batch['entity_spans'], entity_sample_masks=batch['entity_sample_masks'],
-                               inference=True)
+                               doc_pos_tags=batch['doc_pos_tags'], inference=True)
                 entity_clf, rel_clf, rels = result
 
                 # evaluate batch
