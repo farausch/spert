@@ -199,21 +199,14 @@ def create_rel_mask(s1, s2, context_size):
     return mask
 
 
-def create_pos_mask(pos_tag: str, pos_tags: dict):
-    mask = [0] * len(pos_tags)
-    idx = pos_tags[pos_tag]
-    mask[idx] = 1
-    return mask
-
-
 def create_doc_pos_tags(doc):
     # Create a POS tag mask for each byte-pair encoded token in the sentence plus an empty mask at the beginning and end (special tokens)
     doc_pos_tags = []
-    doc_pos_tags.append([0] * len(util.get_pos_dict()))
+    doc_pos_tags.append(0)
     for token in doc._tokens:
         for i in range(token.span_start, token.span_end):
-            doc_pos_tags.append(create_pos_mask(token.pos_tag, util.get_pos_dict()))
-    doc_pos_tags.append([0] * len(util.get_pos_dict()))
+            doc_pos_tags.append(util.get_pos_dict()[token.pos_tag])
+    doc_pos_tags.append(0)
     return doc_pos_tags
 
 

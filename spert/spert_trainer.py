@@ -164,8 +164,7 @@ class SpERTTrainer(BaseTrainer):
                                             prop_drop=self._args.prop_drop,
                                             size_embedding=self._args.size_embedding,
                                             freeze_transformer=self._args.freeze_transformer,
-                                            cache_dir=self._args.cache_path,
-                                            pos_dict_len=len(util.get_pos_dict()))
+                                            cache_dir=self._args.cache_path)
 
         return model
 
