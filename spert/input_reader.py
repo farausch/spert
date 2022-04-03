@@ -2,6 +2,7 @@ import json
 from abc import abstractmethod, ABC
 from collections import OrderedDict
 from logging import Logger
+import math
 from typing import List
 from tqdm import tqdm
 from transformers import BertTokenizer
@@ -233,7 +234,8 @@ def _parse_tokens(jtokens, dataset, tokenizer, spacy_instance):
     # generate spacy sentence from token array and get POS tags
     sentence = Doc(spacy_instance.vocab, words=jtokens)
     sentence = spacy_instance(sentence.text)
-    pos_tags = [(token.pos_) for token in sentence]
+    pos_tags = [token.pos_ for token in sentence]
+    dep_tags = [sum(list(token.dep_.encode('ascii'))) for token in sentence]
 
     # full document encoding including special tokens ([CLS] and [SEP]) and byte-pair encodings of original tokens
     doc_encoding = [tokenizer.convert_tokens_to_ids('[CLS]')]
@@ -245,7 +247,7 @@ def _parse_tokens(jtokens, dataset, tokenizer, spacy_instance):
             token_encoding = [tokenizer.convert_tokens_to_ids('[UNK]')]
         span_start, span_end = (len(doc_encoding), len(doc_encoding) + len(token_encoding))
 
-        token = dataset.create_token(i, span_start, span_end, token_phrase, pos_tags[i])
+        token = dataset.create_token(i, span_start, span_end, token_phrase, pos_tags[i], dep_tags[i])
 
         doc_tokens.append(token)
         doc_encoding += token_encoding

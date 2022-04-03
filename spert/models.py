@@ -34,8 +34,9 @@ class SpERT(BertPreTrainedModel):
         self.bert = BertModel(config)
 
         # layers
-        self.rel_classifier = nn.Linear((config.hidden_size + 1) * 3 + size_embedding * 2, relation_types)
-        self.entity_classifier = nn.Linear((config.hidden_size + 1) * 2 + size_embedding, entity_types)
+        # hidden size gets extended by 2 because each token gets one feature for the POS tag and one for the dependency tag
+        self.rel_classifier = nn.Linear((config.hidden_size + 2) * 3 + size_embedding * 2, relation_types)
+        self.entity_classifier = nn.Linear((config.hidden_size + 2) * 2 + size_embedding, entity_types)
         self.size_embeddings = nn.Embedding(100, size_embedding)
         self.dropout = nn.Dropout(prop_drop)
 
@@ -56,12 +57,13 @@ class SpERT(BertPreTrainedModel):
 
     def _forward_train(self, encodings: torch.tensor, context_masks: torch.tensor, entity_masks: torch.tensor,
                        entity_sizes: torch.tensor, relations: torch.tensor, rel_masks: torch.tensor,
-                       doc_pos_tags: torch.tensor):
+                       doc_pos_tags: torch.tensor, doc_dep_tags: torch.tensor):
         # get contextualized token embeddings from last transformer layer
         context_masks = context_masks.float()
         h = self.bert(input_ids=encodings, attention_mask=context_masks)['last_hidden_state']
-        # Concat a single POS tag feature to each BERT token changing the shape to [n, n, 769] instead of [n, n, 768]
+        # concat a POS tag and dependency tag feature to each BERT token changing the shape to [n, n, 770] instead of [n, n, 768]
         h = torch.cat((doc_pos_tags[..., None], h), -1)
+        h = torch.cat((doc_dep_tags[..., None], h), -1)
 
         batch_size = encodings.shape[0]
 
@@ -86,12 +88,13 @@ class SpERT(BertPreTrainedModel):
 
     def _forward_inference(self, encodings: torch.tensor, context_masks: torch.tensor, entity_masks: torch.tensor,
                            entity_sizes: torch.tensor, entity_spans: torch.tensor, entity_sample_masks: torch.tensor,
-                           doc_pos_tags: torch.tensor):
+                           doc_pos_tags: torch.tensor, doc_dep_tags: torch.tensor):
         # get contextualized token embeddings from last transformer layer
         context_masks = context_masks.float()
         h = self.bert(input_ids=encodings, attention_mask=context_masks)['last_hidden_state']
-        # Concat a single POS tag feature to each BERT token changing the shape to [n, n, 769] instead of [n, n, 768]
+        # concat a POS tag and dependency tag feature to each BERT token changing the shape to [n, n, 770] instead of [n, n, 768]
         h = torch.cat((doc_pos_tags[..., None], h), -1)
+        h = torch.cat((doc_dep_tags[..., None], h), -1)
 
         batch_size = encodings.shape[0]
         ctx_size = context_masks.shape[-1]

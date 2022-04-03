@@ -189,7 +189,7 @@ class SpERTTrainer(BaseTrainer):
             entity_logits, rel_logits = model(encodings=batch['encodings'], context_masks=batch['context_masks'],
                                               entity_masks=batch['entity_masks'], entity_sizes=batch['entity_sizes'],
                                               relations=batch['rels'], rel_masks=batch['rel_masks'],
-                                              doc_pos_tags=batch['doc_pos_tags'])
+                                              doc_pos_tags=batch['doc_pos_tags'], doc_dep_tags=batch['doc_dep_tags'])
 
             # compute loss and optimize parameters
             batch_loss = compute_loss.compute(entity_logits=entity_logits, rel_logits=rel_logits,
@@ -239,7 +239,7 @@ class SpERTTrainer(BaseTrainer):
                 result = model(encodings=batch['encodings'], context_masks=batch['context_masks'],
                                entity_masks=batch['entity_masks'], entity_sizes=batch['entity_sizes'],
                                entity_spans=batch['entity_spans'], entity_sample_masks=batch['entity_sample_masks'],
-                               doc_pos_tags=batch['doc_pos_tags'], inference=True)
+                               doc_pos_tags=batch['doc_pos_tags'], doc_dep_tags=batch['doc_dep_tags'], inference=True)
                 entity_clf, rel_clf, rels = result
 
                 # evaluate batch
