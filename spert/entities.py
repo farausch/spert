@@ -81,7 +81,7 @@ class EntityType:
 
 
 class Token:
-    def __init__(self, tid: int, index: int, span_start: int, span_end: int, phrase: str, pos_tag: int, dep_tag: int):
+    def __init__(self, tid: int, index: int, span_start: int, span_end: int, phrase: str, pos_tag: str, dep_tag: str):
         self._tid = tid  # ID within the corresponding dataset
         self._index = index  # original token index in document
 

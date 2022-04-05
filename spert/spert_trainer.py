@@ -139,7 +139,7 @@ class SpERTTrainer(BaseTrainer):
         # read datasets
         input_reader = input_reader_cls(types_path, self._tokenizer,
                                         max_span_size=args.max_span_size,
-                                        spacy_model=args.spacy_model)
+                                        spacy_model=args.spacy_model_name)
         dataset = input_reader.read(dataset_path, 'dataset')
 
         model = self._load_model(input_reader)
@@ -164,7 +164,9 @@ class SpERTTrainer(BaseTrainer):
                                             prop_drop=self._args.prop_drop,
                                             size_embedding=self._args.size_embedding,
                                             freeze_transformer=self._args.freeze_transformer,
-                                            cache_dir=self._args.cache_path)
+                                            cache_dir=self._args.cache_path,
+                                            pos_dict_len=len(util.get_pos_dict()),
+                                            dep_dict_len=len(util.get_dep_dict()))
 
         return model
 
@@ -278,6 +280,7 @@ class SpERTTrainer(BaseTrainer):
                 result = model(encodings=batch['encodings'], context_masks=batch['context_masks'],
                                entity_masks=batch['entity_masks'], entity_sizes=batch['entity_sizes'],
                                entity_spans=batch['entity_spans'], entity_sample_masks=batch['entity_sample_masks'],
+                               doc_pos_tags=batch['doc_pos_tags'], doc_dep_tags=batch['doc_dep_tags'],
                                inference=True)
                 entity_clf, rel_clf, rels = result
 

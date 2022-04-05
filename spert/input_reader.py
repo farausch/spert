@@ -231,11 +231,11 @@ class JsonPredictionInputReader(BaseInputReader):
 def _parse_tokens(jtokens, dataset, tokenizer, spacy_instance):
     doc_tokens = []
 
-    # generate spacy sentence from token array and get POS tags
+    # generate spacy sentence from token array and get POS and DEP tags
     sentence = Doc(spacy_instance.vocab, words=jtokens)
     sentence = spacy_instance(sentence.text)
     pos_tags = [token.pos_ for token in sentence]
-    dep_tags = [sum(list(token.dep_.encode('ascii'))) for token in sentence]
+    dep_tags = [token.dep_ for token in sentence]
 
     # full document encoding including special tokens ([CLS] and [SEP]) and byte-pair encodings of original tokens
     doc_encoding = [tokenizer.convert_tokens_to_ids('[CLS]')]

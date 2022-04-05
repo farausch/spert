@@ -100,7 +100,7 @@ def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, max_span
 
     # POS and dependency tags per byte-encoded token
     doc_pos_tags = torch.tensor(doc_pos_tags, dtype=torch.int)
-    doc_dep_tags = torch.tensor(doc_dep_tags, dtype=torch.float)
+    doc_dep_tags = torch.tensor(doc_dep_tags, dtype=torch.int)
 
     # also create samples_masks:
     # tensors to mask entity/relation samples of batch
@@ -203,25 +203,32 @@ def create_rel_mask(s1, s2, context_size):
     return mask
 
 
+def create_one_hot_mask(ref: str, ref_dict: dict):
+    mask = [0] * len(ref_dict)
+    idx = ref_dict[ref]
+    mask[idx] = 1
+    return mask
+
+
 def create_doc_pos_tags(doc):
-    # Create a POS tag mask for each byte-pair encoded token in the sentence plus an empty mask at the beginning and end (special tokens)
+    # Create a POS tag mask for the document including an empty mask at the beginning and end (special tokens)
     doc_pos_tags = []
-    doc_pos_tags.append(0)
+    doc_pos_tags.append([0] * len(util.get_pos_dict()))
     for token in doc._tokens:
         for i in range(token.span_start, token.span_end):
-            doc_pos_tags.append(util.get_pos_dict()[token.pos_tag])
-    doc_pos_tags.append(0)
+            doc_pos_tags.append(create_one_hot_mask(token.pos_tag, util.get_pos_dict()))
+    doc_pos_tags.append([0] * len(util.get_pos_dict()))
     return doc_pos_tags
 
 
 def create_doc_dep_tags(doc):
-    # Create a dependency tag mask for each byte-pair encoded token in the sentence plus an empty mask at the beginning and end (special tokens)
+    # Create a dependency tag mask for the document including an empty mask at the beginning and end (special tokens)
     doc_dep_tags = []
-    doc_dep_tags.append(0)
+    doc_dep_tags.append([0] * len(util.get_dep_dict()))
     for token in doc._tokens:
         for i in range(token.span_start, token.span_end):
-            doc_dep_tags.append(token.dep_tag)
-    doc_dep_tags.append(0)
+            doc_dep_tags.append(create_one_hot_mask(token.dep_tag, util.get_dep_dict()))
+    doc_dep_tags.append([0] * len(util.get_dep_dict()))
     return doc_dep_tags
 
 

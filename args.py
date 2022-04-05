@@ -107,7 +107,6 @@ def predict_argparser():
     # Input
     arg_parser.add_argument('--dataset_path', type=str, help="Path to dataset")
     arg_parser.add_argument('--predictions_path', type=str, help="Path to store predictions")
-    arg_parser.add_argument('--spacy_model', type=str, help="Label of SpaCy model (used for tokenization)")
 
     _add_common_args(arg_parser)
 
