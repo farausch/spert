@@ -2,11 +2,11 @@ import json
 from abc import abstractmethod, ABC
 from collections import OrderedDict
 from logging import Logger
-import math
 from typing import List
 from tqdm import tqdm
 from transformers import BertTokenizer
 from spacy.tokens import Doc
+import networkx as nx
 
 from spert import util
 from spert.entities import Dataset, EntityType, RelationType, Entity, Relation, Document
@@ -137,8 +137,15 @@ class JsonInputReader(BaseInputReader):
         jrelations = doc['relations']
         jentities = doc['entities']
 
+        # create spacy document
+        spacy_sentence = Doc(self._spacy_instance.vocab, words=jtokens)
+        spacy_sentence = self._spacy_instance(spacy_sentence.text)
+
+        # get dependency graph
+        dep_graph = _parse_dep_graph(spacy_sentence)
+
         # parse tokens
-        doc_tokens, doc_encoding = _parse_tokens(jtokens, dataset, self._tokenizer, self._spacy_instance)
+        doc_tokens, doc_encoding = _parse_tokens(jtokens, dataset, self._tokenizer, spacy_sentence)
 
         # parse entity mentions
         entities = self._parse_entities(jentities, doc_tokens, dataset)
@@ -147,7 +154,7 @@ class JsonInputReader(BaseInputReader):
         relations = self._parse_relations(jrelations, entities, dataset)
 
         # create document
-        document = dataset.create_document(doc_tokens, entities, relations, doc_encoding)
+        document = dataset.create_document(doc_tokens, entities, relations, doc_encoding, dep_graph)
 
         return document
 
@@ -228,14 +235,12 @@ class JsonPredictionInputReader(BaseInputReader):
         return document
 
 
-def _parse_tokens(jtokens, dataset, tokenizer, spacy_instance):
+def _parse_tokens(jtokens, dataset, tokenizer, spacy_sentence):
     doc_tokens = []
 
     # generate spacy sentence from token array and get POS and DEP tags
-    sentence = Doc(spacy_instance.vocab, words=jtokens)
-    sentence = spacy_instance(sentence.text)
-    pos_tags = [token.pos_ for token in sentence]
-    dep_tags = [token.dep_ for token in sentence]
+    pos_tags = [token.pos_ for token in spacy_sentence]
+    dep_tags = [token.dep_ for token in spacy_sentence]
 
     # full document encoding including special tokens ([CLS] and [SEP]) and byte-pair encodings of original tokens
     doc_encoding = [tokenizer.convert_tokens_to_ids('[CLS]')]
@@ -255,3 +260,10 @@ def _parse_tokens(jtokens, dataset, tokenizer, spacy_instance):
     doc_encoding += [tokenizer.convert_tokens_to_ids('[SEP]')]
 
     return doc_tokens, doc_encoding
+
+def _parse_dep_graph(spacy_sentence):
+    edges = []
+    for token in spacy_sentence:
+        for child in token.children:
+            edges.append(('{0}'.format(token.lower_), '{0}'.format(child.lower_)))
+    return nx.Graph(edges)

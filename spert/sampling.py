@@ -1,5 +1,5 @@
 import random
-
+import networkx as nx
 import torch
 
 from spert import util
@@ -41,7 +41,7 @@ def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, max_span
         pair_rel_types = [r.relation_type.index for r in rels]
         pair_rel_types = [int(t in pair_rel_types) for t in range(1, rel_type_count)]
         pos_rel_types.append(pair_rel_types)
-        pos_rel_masks.append(create_rel_mask(s1, s2, context_size))
+        pos_rel_masks.append(create_rel_mask_sdp(head_entity, tail_entity, context_size, doc))
 
     # negative entities
     neg_entity_spans, neg_entity_sizes = [], []
@@ -142,6 +142,7 @@ def create_eval_sample(doc, max_span_size: int):
     doc_dep_tags = create_doc_dep_tags(doc)
     token_count = len(doc.tokens)
     context_size = len(encodings)
+    doc_id = doc.doc_id
 
     # create entity candidates
     entity_spans = []
@@ -169,6 +170,8 @@ def create_eval_sample(doc, max_span_size: int):
     doc_pos_tags = torch.tensor(doc_pos_tags, dtype=torch.int)
     doc_dep_tags = torch.tensor(doc_dep_tags, dtype=torch.int)
 
+    doc_id = torch.tensor(doc_id, dtype=int)
+
     # entities
     if entity_masks:
         entity_masks = torch.stack(entity_masks)
@@ -187,7 +190,8 @@ def create_eval_sample(doc, max_span_size: int):
         entity_sample_masks = torch.zeros([1], dtype=torch.bool)
 
     return dict(encodings=encodings, context_masks=context_masks, entity_masks=entity_masks, doc_pos_tags=doc_pos_tags,
-                entity_sizes=entity_sizes, entity_spans=entity_spans, entity_sample_masks=entity_sample_masks, doc_dep_tags=doc_dep_tags)
+                entity_sizes=entity_sizes, entity_spans=entity_spans, entity_sample_masks=entity_sample_masks, doc_dep_tags=doc_dep_tags,
+                doc_ids=doc_id)
 
 
 def create_entity_mask(start, end, context_size):
@@ -201,6 +205,60 @@ def create_rel_mask(s1, s2, context_size):
     end = s2[0] if s1[1] < s2[0] else s1[0]
     mask = create_entity_mask(start, end, context_size)
     return mask
+
+
+def create_rel_mask_sdp(head_entity, tail_entity, context_size, doc):
+    s1, s2 = head_entity.span, tail_entity.span
+    start = s1[1] if s1[1] < s2[0] else s2[1]
+    end = s2[0] if s1[1] < s2[0] else s1[0]
+    #mask = create_entity_mask(start, end, context_size)
+    mask = torch.ones(context_size, dtype=torch.bool)
+    try:
+        if s1[1] < s2[0]:
+            sdp = nx.shortest_path(doc.dep_graph, source=head_entity._tokens[-1].phrase.lower(), target=tail_entity._tokens[0].phrase.lower())
+        else:
+            sdp = nx.shortest_path(doc.dep_graph, source=tail_entity._tokens[-1].phrase.lower(), target=head_entity._tokens[0].phrase.lower())
+    except:
+        # it might happen that spacy tokenizes differently than the tokens provided in the json input file
+        # in this case the full context mask it returned because the tokens searched for are not found in the graph
+        return mask
+    for token in doc._tokens:
+        if token.phrase.lower() not in sdp:
+        #if token.span_end > start and token.span_start < end and token.phrase.lower() not in sdp:
+            mask[token.span_start:token.span_end] = 0
+    return mask
+
+
+def create_rel_mask_sdp_by_spans(s1, s2, context_size, doc):
+    start = s1[1] if s1[1] < s2[0] else s2[1]
+    end = s2[0] if s1[1] < s2[0] else s1[0]
+    #mask = create_entity_mask(start, end, context_size)
+    mask = torch.ones(context_size, dtype=torch.bool)
+    s1_tokens = find_tokens_by_span(s1, doc)
+    s2_tokens = find_tokens_by_span(s2, doc)
+    try:
+        if s1[1] < s2[0]:
+            sdp = nx.shortest_path(doc.dep_graph, source=s1_tokens[-1].phrase.lower(), target=s2_tokens[0].phrase.lower())
+        else:
+            sdp = nx.shortest_path(doc.dep_graph, source=s2_tokens[-1].phrase.lower(), target=s1_tokens[0].phrase.lower())
+    except:
+        # it might happen that spacy tokenizes differently than the tokens provided in the json input file
+        # in this case the full context mask it returned because the tokens searched for are not found in the graph
+        return mask
+    for token in doc._tokens:
+        if token.phrase.lower() not in sdp:
+        #if token.span_end > start and token.span_start < end and token.phrase.lower() not in sdp:
+            mask[token.span_start:token.span_end] = 0
+    return mask
+
+
+def find_tokens_by_span(s, doc):
+    tokens = []
+    s_avg = float(s[0] + s[1]) / 2
+    for token in doc._tokens:
+        if (token.span_start >= s[0] and token.span_end <= s[1]) or (token.span_start < s_avg and token.span_end > s_avg):
+            tokens.append(token)
+    return tokens
 
 
 def create_one_hot_mask(ref: str, ref_dict: dict):

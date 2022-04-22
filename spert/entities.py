@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from typing import List
+import networkx as nx
 from torch.utils.data import Dataset as TorchDataset
 
 from spert import sampling
@@ -278,12 +279,13 @@ class Relation:
 
 class Document:
     def __init__(self, doc_id: int, tokens: List[Token], entities: List[Entity], relations: List[Relation],
-                 encoding: List[int]):
+                 encoding: List[int], dep_graph: nx.graph):
         self._doc_id = doc_id  # ID within the corresponding dataset
 
         self._tokens = tokens
         self._entities = entities
         self._relations = relations
+        self._dep_graph = dep_graph
 
         # byte-pair document encoding including special tokens ([CLS] and [SEP])
         self._encoding = encoding
@@ -307,6 +309,10 @@ class Document:
     @property
     def encoding(self):
         return self._encoding
+
+    @property
+    def dep_graph(self):
+        return self._dep_graph
 
     @encoding.setter
     def encoding(self, value):
@@ -383,8 +389,8 @@ class Dataset(TorchDataset):
         self._tid += 1
         return token
 
-    def create_document(self, tokens, entity_mentions, relations, doc_encoding) -> Document:
-        document = Document(self._doc_id, tokens, entity_mentions, relations, doc_encoding)
+    def create_document(self, tokens, entity_mentions, relations, doc_encoding, dep_graph) -> Document:
+        document = Document(self._doc_id, tokens, entity_mentions, relations, doc_encoding, dep_graph)
         self._documents[self._doc_id] = document
         self._doc_id += 1
 

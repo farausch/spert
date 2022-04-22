@@ -35,7 +35,6 @@ class SpERT(BertPreTrainedModel):
         self.bert = BertModel(config)
 
         # layers
-        # hidden size gets extended by 2 because each token gets one feature for the POS tag and one for the dependency tag
         self.rel_classifier = nn.Linear((config.hidden_size + pos_dict_len + dep_dict_len) * 3 + size_embedding * 2, relation_types)
         self.entity_classifier = nn.Linear((config.hidden_size + pos_dict_len + dep_dict_len) * 2 + size_embedding, entity_types)
         self.size_embeddings = nn.Embedding(100, size_embedding)
@@ -55,6 +54,9 @@ class SpERT(BertPreTrainedModel):
             # freeze all transformer weights
             for param in self.bert.parameters():
                 param.requires_grad = False
+
+    def _set_dataset(self, dataset):
+        self._dataset = dataset
 
     def _forward_train(self, encodings: torch.tensor, context_masks: torch.tensor, entity_masks: torch.tensor,
                        entity_sizes: torch.tensor, relations: torch.tensor, rel_masks: torch.tensor,
@@ -90,7 +92,7 @@ class SpERT(BertPreTrainedModel):
 
     def _forward_inference(self, encodings: torch.tensor, context_masks: torch.tensor, entity_masks: torch.tensor,
                            entity_sizes: torch.tensor, entity_spans: torch.tensor, entity_sample_masks: torch.tensor,
-                           doc_pos_tags: torch.tensor, doc_dep_tags: torch.tensor):
+                           doc_pos_tags: torch.tensor, doc_dep_tags: torch.tensor, doc_ids):
         # get contextualized token embeddings from last transformer layer
         context_masks = context_masks.float()
         h = self.bert(input_ids=encodings, attention_mask=context_masks)['last_hidden_state']
@@ -108,7 +110,7 @@ class SpERT(BertPreTrainedModel):
 
         # ignore entity candidates that do not constitute an actual entity for relations (based on classifier)
         relations, rel_masks, rel_sample_masks = self._filter_spans(entity_clf, entity_spans,
-                                                                    entity_sample_masks, ctx_size)
+                                                                    entity_sample_masks, ctx_size, doc_ids)
 
         rel_sample_masks = rel_sample_masks.float().unsqueeze(-1)
         h_large = h.unsqueeze(1).repeat(1, max(min(relations.shape[1], self._max_pairs), 1), 1, 1)
@@ -186,7 +188,7 @@ class SpERT(BertPreTrainedModel):
         chunk_rel_logits = self.rel_classifier(rel_repr)
         return chunk_rel_logits
 
-    def _filter_spans(self, entity_clf, entity_spans, entity_sample_masks, ctx_size):
+    def _filter_spans(self, entity_clf, entity_spans, entity_sample_masks, ctx_size, doc_ids):
         batch_size = entity_clf.shape[0]
         entity_logits_max = entity_clf.argmax(dim=-1) * entity_sample_masks.long()  # get entity type (including none)
         batch_relations = []
@@ -198,6 +200,8 @@ class SpERT(BertPreTrainedModel):
             rel_masks = []
             sample_masks = []
 
+            doc = self._dataset._documents[doc_ids[i].item()]
+
             # get spans classified as entities
             non_zero_indices = (entity_logits_max[i] != 0).nonzero().view(-1)
             non_zero_spans = entity_spans[i][non_zero_indices].tolist()
@@ -208,7 +212,7 @@ class SpERT(BertPreTrainedModel):
                 for i2, s2 in zip(non_zero_indices, non_zero_spans):
                     if i1 != i2:
                         rels.append((i1, i2))
-                        rel_masks.append(sampling.create_rel_mask(s1, s2, ctx_size))
+                        rel_masks.append(sampling.create_rel_mask_sdp_by_spans(s1, s2, ctx_size, doc))
                         sample_masks.append(1)
 
             if not rels:

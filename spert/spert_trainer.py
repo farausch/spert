@@ -147,7 +147,7 @@ class SpERTTrainer(BaseTrainer):
 
         self._predict(model, dataset, input_reader)
 
-    def _load_model(self, input_reader):
+    def _load_model(self, input_reader, dataset=None):
         model_class = models.get_model(self._args.model_type)
 
         config = BertConfig.from_pretrained(self._args.model_path, cache_dir=self._args.cache_path)
@@ -212,6 +212,8 @@ class SpERTTrainer(BaseTrainer):
               epoch: int = 0, updates_epoch: int = 0, iteration: int = 0):
         self._logger.info("Evaluate: %s" % dataset.label)
 
+        model._set_dataset(dataset)
+
         if isinstance(model, DataParallel):
             # currently no multi GPU support during evaluation
             model = model.module
@@ -241,7 +243,8 @@ class SpERTTrainer(BaseTrainer):
                 result = model(encodings=batch['encodings'], context_masks=batch['context_masks'],
                                entity_masks=batch['entity_masks'], entity_sizes=batch['entity_sizes'],
                                entity_spans=batch['entity_spans'], entity_sample_masks=batch['entity_sample_masks'],
-                               doc_pos_tags=batch['doc_pos_tags'], doc_dep_tags=batch['doc_dep_tags'], inference=True)
+                               doc_pos_tags=batch['doc_pos_tags'], doc_dep_tags=batch['doc_dep_tags'],
+                               doc_ids=batch["doc_ids"], inference=True)
                 entity_clf, rel_clf, rels = result
 
                 # evaluate batch
