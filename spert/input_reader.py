@@ -194,7 +194,7 @@ class JsonInputReader(BaseInputReader):
 class JsonPredictionInputReader(BaseInputReader):
     def __init__(self, types_path: str, tokenizer: BertTokenizer, spacy_model: str = None,
                  max_span_size: int = None, logger: Logger = None):
-        super().__init__(types_path, tokenizer, max_span_size=max_span_size, logger=logger)
+        super().__init__(types_path, tokenizer, spacy_model, max_span_size=max_span_size, logger=logger)
         self._spacy_model = spacy_model
 
         self._nlp = spacy.load(spacy_model) if spacy is not None and spacy_model is not None else None
@@ -220,7 +220,7 @@ class JsonPredictionInputReader(BaseInputReader):
             jtokens = [t.text for t in self._nlp(document)]
 
         # parse tokens
-        doc_tokens, doc_encoding = _parse_tokens(jtokens, dataset, self._tokenizer)
+        doc_tokens, doc_encoding = _parse_tokens(jtokens, dataset, self._tokenizer, self._spacy_instance)
 
         # create document
         document = dataset.create_document(doc_tokens, [], [], doc_encoding)

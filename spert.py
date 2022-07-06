@@ -1,10 +1,12 @@
 import argparse
-
+from flask import Flask
 from args import train_argparser, eval_argparser, predict_argparser
 from config_reader import process_configs
 from spert import input_reader
 from spert.spert_trainer import SpERTTrainer
+import json
 
+api = Flask(__name__)
 
 def _train():
     arg_parser = train_argparser()
@@ -39,6 +41,18 @@ def __predict(run_args):
                     input_reader_cls=input_reader.JsonPredictionInputReader)
 
 
+@api.route('/fs-predict', methods=['POST', 'GET'])
+def predict():
+    sentence = ["Die Verbindlichkeiten gegenüber verbundenen Unternehmen betragen zum Ende des Geschäftsjahres TEUR 1500."]
+    with open("data/datasets/financial_statements/financial_statements_prediction_example.json", 'w', encoding='utf-8') as f:
+        json.dump(sentence, f, ensure_ascii=False)
+    _predict()
+    with open("data/predictions.json", 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    # return data as json http response
+    return json.dumps(data, ensure_ascii=False)
+
+
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(add_help=False)
     arg_parser.add_argument('mode', type=str, help="Mode: 'train' or 'eval'")
@@ -50,5 +64,7 @@ if __name__ == '__main__':
         _eval()
     elif args.mode == 'predict':
         _predict()
+    elif args.mode == 'api':
+        api.run(debug=True)
     else:
         raise Exception("Mode not in ['train', 'eval', 'predict'], e.g. 'python spert.py train ...'")
